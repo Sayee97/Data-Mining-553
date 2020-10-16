@@ -83,46 +83,17 @@ class Helper:
 		return hashed_values_each_row
 
 	def generate_hash(self, NUMBER_OF_HASH_FUNCTIONS):
-		hash_val = set([(7960778426191620468, 1601073713816310069, 52368),
-		 (7831152705390563964, 4705457223944280482, 52368), 
-		 (844720600218478240, 3317567590709987248, 52368), 
-		 (3330167399431941086, 4738391131361491441, 52368), 
-		 (1559521054175740197, 5164076707454038942, 52368), 
-		 (7461357922965555065, 9178893876009454474, 52368), 
-		 (7875232194073162640, 4110281485611768498, 52368), 
-		 (2320446363199997945, 3824664871521776964, 52368), 
-		 (1957373065048303663, 4845643447224352718, 52368), 
-		 (329592056279686098, 8379231269947868513, 52368), 
-		 (6283387047437257041, 3359664163991090847, 52368), 
-		 (9220778401274251138, 5473938098476607164, 52368), 
-		 (5888858691079265684, 3337812725841643675, 52368), 
-		 (7412542259511328842, 7922570504607713247, 52368),
-		  (7934351388339294683, 4111493018870031312, 52368), 
-		  (4695318463406440120, 8807703397538162098, 52368), 
-		  (3431650513912567035, 3688089768933353778, 52368), 
-		  (8630417001859198914, 6812292384816374028, 52368), 
-		  (4630753437454300883, 6040487568089202642, 52368), 
-		  (8312174810397109455, 2304936983845495923, 52368), 
-		  (8033861143366882855, 2574263769940200819, 52368), 
-		  (3357440514529337414, 4593842799811611491, 52368), 
-		  (8594767445816985761, 4753654029949017785, 52368), 
-		  (8372516979407777331, 7343798629760420335, 52368), 
-		  (3907121524486219888, 6102972418297087710, 52368),
-		  (8154056408116777046, 4193763847229834397, 52368), 
-		  (1517137920431471569, 8330334269844145946, 52368), 
-		  (1636562308039547769, 3235326538807567540, 52368), 
-		  (2126934262022313337, 6695109256688246402, 52368), 
-		  (1629954137772494897, 5142794054636586632, 52368)])
 
+		random.seed(a=2)
+		hash_val = []
+		a = random.sample(range(1, sys.maxsize-1), 30)
+		b = random.sample(range(0, sys.maxsize-1), 30)
+		for i,j in zip(a,b):
+			hash_val.append((i,j, 26184))
 		return hash_val
 
-	def modify_input(self, rdd_lines):
 
-		"""
-		return: 1. rdd: user_index = list([business_indexes])
-				2. rdd: business_indexes
-				3. user indexes
-		"""
+	def modify_input(self, rdd_lines):
 
 		rdd_columns = rdd_lines.map(lambda data_row: (data_row['business_id'],data_row['user_id']))
 
@@ -174,8 +145,6 @@ def main():
 	print("Arguments Passed: ", input_file, output_file)
 
 	conf = SparkConf().setMaster("local").setAppName("sayee").set("spark.executor.memory", "4g").set("spark.driver.memory", "4g")
-
-	#conf = SparkConf().setMaster("local").setAppName("sayee").set("spark.executor.memory", "4g").set("spark.driver.memory", "4g")
 	sc_object = SparkContext(conf=conf)
 	sc_object.setLogLevel("WARN")
 	rdd_lines = sc_object.textFile(input_file).map(lambda line: json.loads(line))
@@ -187,8 +156,6 @@ def main():
 
 
 	pairs = signature_helper.make_candidates(signature_rdd)
-
-	print(pairs.count(), "Kya length!!!!!")
 
 	make_rdd_b_user = helper.make_rdd(rdd_lines, refer_business_indexes, refer_user_indexes)
 

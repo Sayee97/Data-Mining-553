@@ -58,15 +58,15 @@ class User_Based:
 	def hash_functions_vals(self, id1, hash_vals):
 		ans = []
 		for a,b,c in hash_vals:
-			temp = ((a*id1+b))%c
+			temp = ((a*id1+b)%23333333333)%c
 			ans.append(temp)
 		return ans
 
 	def generate_hash(self, length_bus):
 		random.seed(a=2)
 		hash_val = []
-		a = random.sample(range(1, 100000-1), 30)
-		b = random.sample(range(0, 100000-1), 30)
+		a = random.sample(range(1, sys.maxsize-1), 30)
+		b = random.sample(range(0, sys.maxsize-1), 30)
 		for i,j in zip(a,b):
 			hash_val.append((i,j, length_bus*2))
 		return hash_val
@@ -236,6 +236,7 @@ def main():
 		helper.write_file(required_format, model_file)
 
 	else:
+		print("sayee")
 		dict_convert, rdd_cand = item_based_helper.build_model(rdd_columns, user_index_rdd, reverse_user_dict, business_index_rdd, reverse_business_dict)
 		candidate_pair_int = item_based_helper.make_pairs(dict_convert, rdd_cand)
 		compute_simi = candidate_pair_int.map(lambda x:(x,helper.pearson(dict_convert[x[0]], dict_convert[x[1]]))).filter(lambda x:x[1]>0)
