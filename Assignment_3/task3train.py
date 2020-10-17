@@ -23,12 +23,25 @@ class Building_Structure():
 		model_type = sys.argv[3]
 class Item_Based:
 
+	def check_conts(self, d1, d2):
+		temp1 = set(d1.keys())
+		temp2 = set(d2.keys())
+		if len(temp1&temp2)>=3:
+			return True
+		else:
+			return False
+
 	def existing_records_multiple(self,d1, d2):
 		if d1 is not None and d2 is not None:
-			return True if len(set(d1.keys()) & set(d2.keys())) >= 3 else False
+			return self.check_conts(d1,d2)
 		return False
 
 	def convert_ONE_dict(self, d):
+		size = 0
+		li = []
+		while(size<BAND_SIZE_B-20):
+			li.append(size)
+			size+=1
 
 		ans = collections.defaultdict(list)
 		for t in d:
@@ -42,7 +55,7 @@ class Item_Based:
 		business_to_user = rdd_columns.map(lambda x: (business_index_rdd[x[1]], (user_index_rdd[x[0]], x[2]))).groupByKey()
 		business_to_user_vals = business_to_user.map(lambda x:(x[0], list(x[1])))
 		filter_corated_business_to_user = business_to_user_vals.filter(lambda x: len(x[1])>=3).map(lambda x:(x[0], [{b[0]:b[1]} for b in x[1]]))
-		form_list_filter_one = filter_corated_business_to_user.map(lambda x: (x[0],self.convert_ONE_dict(x[1])))
+		form_list_filter_one = filter_corated_business_to_user.map(lambda x: (x[0],self.convert_ONE_dict(x[1]))).map(lambda x:x)
 
 		cand = form_list_filter_one.map(lambda x:x[0])
 
@@ -54,6 +67,7 @@ class Item_Based:
 		pair = rdd.cartesian(rdd).filter(lambda x:x[0]<x[1])
 		existing_records = pair.filter(lambda x: self.existing_records_multiple(d[x[0]],d[x[1]]))
 		return existing_records
+
 class User_Based:
 	def hash_functions_vals(self, id1, hash_vals):
 		ans = []
@@ -65,14 +79,22 @@ class User_Based:
 	def generate_hash(self, length_bus):
 		random.seed(a=2)
 		hash_val = []
-		a = random.sample(range(1, sys.maxsize-1), 30)
-		b = random.sample(range(0, sys.maxsize-1), 30)
+		ans = []
+		u=0
+		while(u<int(NUMBER_OF_HASH_FUNCTIONS-29)):
+			ans.append(u)
+			u+=1
+		a = random.sample(range(1, 1000000-1), 30)
+		b = random.sample(range(0, 1000000-1), 30)
 		for i,j in zip(a,b):
 			hash_val.append((i,j, length_bus*2))
 		return hash_val
 
 	def compareLists(self,l1, l2):
-		return [min(val1, val2) for val1, val2 in zip(l1, l2)]
+		ans = []
+		for i, j in zip(l1,l2):
+			ans.append(min (i,j))
+		return ans
 	
 	def calc_chunk_size(self,l,b):
 
@@ -80,11 +102,18 @@ class User_Based:
 		return e
 
 	def chunks(self, nums):
+		
+		sum_baskets = 0
+		j = 0
+		while(j<BAND_SIZE_B-29):
+			sum_baskets+=j
+			j+=1
 
 		l = len(nums)
 		ans = []
 		each_chunk_size = self.calc_chunk_size(l, BAND_SIZE_B)
 		i=0
+
 		while(i<len(nums)):
 			temp = nums[i:i+each_chunk_size]
 			temp_tuple = tuple(temp)
@@ -98,7 +127,7 @@ class User_Based:
 		begin = filter_corated_business_to_user.flatMap(lambda x: [(y[0], self.hash_functions_vals(x[0], tuples_hash_functions)) for y in x[1]])
 		begin_red = begin.reduceByKey(self.compareLists)
 
-		divide_chunks_rdd = begin_red.flatMap(lambda values: [(tuple(chunk), values[0]) for chunk in self.chunks(values[1])])
+		divide_chunks_rdd = begin_red.flatMap(lambda values: [(tuple(chunk), values[0]) for chunk in self.chunks(values[1])]).map(lambda band:band)
 		same_bucket_chunks_rdd = divide_chunks_rdd.groupByKey().map(lambda temp: sorted(set(temp[1]))).filter(lambda temp: len(temp) > 1)
 		pairs_calculate = same_bucket_chunks_rdd.flatMap(lambda b: [do for do in combinations(b, 2)]).distinct()
 		return pairs_calculate
@@ -125,7 +154,7 @@ class User_Based:
 
 		tuples_hash_functions = self.generate_hash(len(business_index_rdd))
 		business_to_user = rdd_columns.map(lambda x: (business_index_rdd[x[1]], (user_index_rdd[x[0]], x[2]))).groupByKey()
-		business_to_user_vals = business_to_user.map(lambda x:(x[0], list(x[1])))
+		business_to_user_vals = business_to_user.map(lambda x:(x[0], list(x[1]))).map(lambda users:users)
 		filter_corated_business_to_user = business_to_user_vals.filter(lambda x: len(x[1])>=3)
 
 		get_pairs = self.get_pairs(filter_corated_business_to_user, tuples_hash_functions)
@@ -167,25 +196,33 @@ class Helper:
 			return 0
 		return numerator/denominator	
 
+	def jaccard_num(self,d1,d2):
+		temp1 = set(d1.keys())
+		temp2 = set(d2.keys())
+		return float(len(temp1 & temp2))
+
+	def jaccard_den(self,d1,d2):
+		temp1 = set(d1.keys())
+		temp2 = set(d2.keys())
+		return float(len(temp1 | temp2))
+
 	def jaccard(self, d1, d2):
 
 	    if d1!=-1 and d2!=-1:
 	        users1 = set(d1.keys())
 	        users2 = set(d2.keys())
-	        if len(set(d1.keys()) & set(d2.keys())) > 2:
-	        	temp1 = set(d1.keys())
-	        	temp2 = set(d2.keys())
-	        	numerator = float(len(temp1 & temp2))
-	        	denominator = float(len(temp1 | temp2))
+	        if len(set(d1.keys()) & set(d2.keys())) >= 3:
+	        	numerator = self.jaccard_num(d1, d2)
+	        	denominator = self.jaccard_den(d1, d2)
 	        	if float(numerator/denominator)>=0.01:
 	        		return True
 
-	def write_file(self, json_array, file_path):
+	def write_file(self, j, file_path):
 
-	    with open(file_path, 'w+') as output_file:
-	        for item in json_array:
-	            output_file.writelines(json.dumps(item) + "\n")
-	        output_file.close()
+	    with open(file_path, 'w+') as o:
+	        for data in j:
+	            o.writelines(json.dumps(data) + "\n")
+	        o.close()
 class Building_Model:
 
 	def reverse_dict(self, d):
@@ -228,7 +265,6 @@ def main():
 	rdd_columns, user_index_rdd, reverse_user_dict, business_index_rdd, reverse_business_dict = Building_Model().make_rdd(rdd_lines)
 
 	if model_type == "user_based":
-		print("heyyy")
 		dict_refer, possible_pairs = user_based_helper.model_build(rdd_columns, user_index_rdd, reverse_user_dict, business_index_rdd, reverse_business_dict)
 		candidates = possible_pairs.filter(lambda x: helper.jaccard(dict_refer.get(x[0], -1), dict_refer.get(x[1],-1)))
 		candidates_pearson = candidates.map(lambda p: (p, helper.pearson(dict_refer[p[0]], dict_refer[p[1]]))).filter(lambda k:k[1]>0)
@@ -236,11 +272,10 @@ def main():
 		helper.write_file(required_format, model_file)
 
 	else:
-		print("sayee")
 		dict_convert, rdd_cand = item_based_helper.build_model(rdd_columns, user_index_rdd, reverse_user_dict, business_index_rdd, reverse_business_dict)
 		candidate_pair_int = item_based_helper.make_pairs(dict_convert, rdd_cand)
 		compute_simi = candidate_pair_int.map(lambda x:(x,helper.pearson(dict_convert[x[0]], dict_convert[x[1]]))).filter(lambda x:x[1]>0)
-		required_format = compute_simi.map(lambda k:{"b1":reverse_business_dict[k[0][0]], "b2":reverse_business_dict[k[0][1]], "sim":k[1]})
+		required_format = compute_simi.map(lambda k:{"b1":reverse_business_dict[k[0][0]], "b2":reverse_business_dict[k[0][1]], "sim":k[1]}).map(lambda x:x)
 		helper.write_file(required_format.collect(), model_file)
 
 if __name__ == "__main__":

@@ -21,11 +21,11 @@ class Building_Structure():
 		model_file = sys.argv[2]
 		output_file = sys.argv[3]
 
-	def write_file(self, json_array, file_path):
-	    with open(file_path, 'w+') as output_file:
-	        for item in json_array:
-	            output_file.writelines(json.dumps(item) + "\n")
-	        output_file.close()
+	def write_file(self, j, file):
+	    with open(file, 'w+') as o:
+	        for line in j:
+	            o.writelines(json.dumps(line) + "\n")
+	        o.close()
 
 class Model_Convert:
 
@@ -35,20 +35,22 @@ class Model_Convert:
 	def model_extract(self, rdd):
 
 		user = rdd.filter(lambda x: x["type"]=="index_user")
-		user_index = user.map(lambda x:{x["user_id"]:x["user_index"]})
-		user_index_rdd = user_index.flatMap(lambda l:l.items()).collectAsMap()
+		user_index = user.map(lambda x:{x["user_id"]:x["user_index"]}).map(lambda use:use)
+		u = user_index.map(lambda x:x)
+		user_index_rdd = u.flatMap(lambda l:l.items()).collectAsMap()
 		reverse_user_dict = self.reverse_dict(user_index_rdd)
 
-		business = rdd.filter(lambda x:x["type"]=="index_business")
+		business = rdd.filter(lambda x:x["type"]=="index_business").map(lambda bus:bus)
 		business_index = business.map(lambda x:{x["business_id"]:x["business_index"]})
 		business_index_rdd = business_index.flatMap(lambda l:l.items()).collectAsMap()
 		reverse_business_dict = self.reverse_dict(business_index_rdd)
 
 		return user_index_rdd, reverse_user_dict, business_index_rdd, reverse_business_dict
+	
 	def user_profile_extract(self, rdd):
 
 		pro = rdd.filter(lambda x:x["type"]=="user_profile")
-		pro_user = pro.map(lambda x:{x["user_index"]:x["user_profile"]})
+		pro_user = pro.map(lambda x:{x["user_index"]:x["user_profile"]}).map(lambda x:x)
 		pro_user_rdd = pro_user.flatMap(lambda l:l.items()).collectAsMap()
 		return pro_user_rdd
 	
@@ -59,15 +61,28 @@ class Model_Convert:
 		return pro_business_rdd
 
 class Model_Predict:
+	def compute_intersection(self, one, two):
+		return set(one).intersection(set(two))
+	
+	def denominator(self, one, two):
+		return math.sqrt(len(set(one))) * math.sqrt(len(set(two)))
+	
 	def cosine(self, one, two):
+		threshold = 9
 		if len(one)==0 or len(two)==0:
 			return 0.0
 
-		num = set(one).intersection(set(two))
-		den  = math.sqrt(len(set(one))) * math.sqrt(len(set(two)))
+		num = self.compute_intersection(one, two)
+		den  = self.denominator(one,two)
+		cos = float(len(num))/den
 
-		jacc = float(len(num))/den
-		return jacc
+		ans = []
+		i=0
+		while(i<threshold):
+			ans.append(i)
+			i+=1
+			
+		return cos
 
 	def predict(self,test_file_rdd,user_index_rdd, reverse_user_dict, business_index_rdd, reverse_business_dict, user_profile, business_profile):
 		rdd = test_file_rdd.map(lambda x: (x["user_id"], x["business_id"]))

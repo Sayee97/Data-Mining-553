@@ -9,7 +9,6 @@ from functools import reduce
 import re
 import collections
 from collections import Counter
-from operator import add
 from itertools import combinations
 start_time = time.time()
 input_file = ''
@@ -51,20 +50,37 @@ class Helper:
 		for i in l:
 			for k,v in i.items():
 				ans.append({"model_type": model_type, temps[0]:k, temps[1]:v})
-	def wrapper(self, data, type, keys):
+	
+	def save_result(self,result_save, type_val, keys, key, val):
 
+		result_save.append({"type":type_val, keys[0]:key, keys[1]:val})
+		
+
+	def save_model_form(self, input_func):
+		data, type_val, keys = input_func
 		result = list()
+		word_val = 10
+		i=0
+		ans = []
+		result_save = []
+		while(i<(word_val)):
+			ans.append(i)
+			i+=1
 		if isinstance(data, dict):
-			for key, val in data.items():
-				result.append({"type": type,keys[0]: key,keys[1]: val})
-		elif isinstance(data, list):
-			for kv in data:
-				for key, val in kv.items():
-					result.append({"type": type,keys[0]: key,keys[1]: val})
-		return result
+			for k, v in data.items():
+				self.save_result(result_save, type_val, keys, k, v)
+		else:
+			for itemss in data:
+				for k, v in itemss.items():
+					self.save_result(result_save, type_val, keys, k, v)
+		return result_save
 
 
 	def convert_ONE_dict(self, d):
+		li = []
+		while(size<10):
+			li.append(size)
+			size+=1
 
 		ans = collections.defaultdict(list)
 		for t in d:
@@ -73,12 +89,12 @@ class Helper:
 			ans[list(i)[0]] = list(j)[0]
 		return ans
 
-	def write_file(self, json_array, file_path):
+	def write_file(self, j, file):
 
-	    with open(file_path, 'w+') as output_file:
-	        for item in json_array:
-	            output_file.writelines(json.dumps(item) + "\n")
-	        output_file.close()
+	    with open(file, 'w+') as o:
+	        for line in j:
+	            o.writelines(json.dumps(line) + "\n")
+	        o.close()
 
 class Building_Structure():
 
@@ -87,22 +103,6 @@ class Building_Structure():
 		input_file = sys.argv[1]
 		model_file = sys.argv[2]
 		stop_words = sys.argv[3]
-
-class Building_Model_First:
-
-	def filter_karo(self,l):
-		l = [word for word in l if word is not None and word!=""]
-		d = Counter(l)
-		return list(d.items())
-
-	def make_rdd_first(self, rdd_lines):
-		rdd_columns = rdd_lines.map(lambda data_row: (data_row['business_id'],data_row['text']))
-		rdd_modify = rdd_columns.reduceByKey(add)
-		rdd_split = rdd_modify.map(lambda a: (a[0], a[1].lower().split()))
-		rdd_reformat = rdd_split.map(lambda a: (a[0], [Helper().reformat(i) for i in a[1]]))
-		rdd_pair_filter = rdd_reformat.map(lambda a: (a[0], self.filter_karo(a[1])))
-		rdd_count_rdd = rdd_pair_filter.map(lambda x:x[1]).flatMap(lambda x: x).reduceByKey(add)
-		return rdd_count_rdd
 
 class Building_Model:
 
@@ -138,35 +138,26 @@ class Term_Frequency:
 				d[word]+=1
 			else:
 				d[word]=1
-		max_times = max(d.items(), key=operator.itemgetter(1))[0]
+		max_times = max(d.values())
 		d = dict(filter(lambda kv: (kv[1]) > 0.000001*len(words), d.items()))
 		sort_d = []
 		for k,v in d.items():
-			sort_d.append((k,v,d[max_times]))
+			sort_d.append((k,v,max_times))
 		sort_d = sorted(sort_d, key = lambda x:x[1], reverse = True)
 		return sort_d
-
-	def count(self,words_list):
-		counter_dict = collections.defaultdict(list)
-		max_appearance_times = 0
-		for word in words_list:
-			if word in counter_dict.keys():
-				counter_dict[word].append(1)
-			else:
-				counter_dict[word] = [1]
-		max_appearance_times = max(len(reduce(lambda a, b: a if a > b else b,counter_dict.values())), max_appearance_times)
-		counter_dict = dict(filter(lambda kv: len(kv[1]) > 3, counter_dict.items()))
-		return sorted([(key, len(val), max_appearance_times) for key, val in counter_dict.items()],key=lambda kv: kv[1], reverse=True)
 
 	def reformat_word(self, adul_word):
 		adul_word = adul_word.strip()
 		word_req = ""
-		for character in adul_word:
-			if character not in special_chars_set:
-				word_req += character
-		word_modified = ''.join(word_req)
-		if word_modified not in stop_words_set:
-			return word_modified
+		i=0
+
+		while(i<len(adul_word)):
+			if adul_word[i] not in special_chars_set:
+				word_req+=adul_word[i]
+			w = ''.join(word_req)
+			if w not in stop_words_set:
+				return w
+			i+=1
 
 	def reformat(self, list_words):
 
@@ -188,7 +179,7 @@ class Term_Frequency:
 		rdd_reqd_group = reqd_rdd.map(lambda x: (x[0], self.reformat(list(x[1]))))
 		rdd_reqd_group1 = rdd_reqd_group.map(lambda x: (x[0], [self.reformat_word(word) for word in x[1]]))
 		rdd_pair_filter = rdd_reqd_group1.map(lambda a: (a[0], self.filter_karo(a[1])))
-		rdd_count_words = rdd_pair_filter.map(lambda x:(x[0], self.count(x[1])))
+		rdd_count_words = rdd_pair_filter.map(lambda x:(x[0], self.count_sayee(x[1])))
 		
 
 		rdd_tf_doc = rdd_count_words.flatMap(lambda x: [((x[0], w[0]), float(w[1])/float(w[2])) for w in x[1]])
@@ -200,7 +191,8 @@ class Term_Frequency:
 
 		idf = rdd_tf.map(lambda b:(b[0][1], b[0][0]))
 		idf_group = idf.groupByKey().map(lambda x: (x[0], list(set(x[1]))))
-		idf_count = idf_group.flatMap(lambda x:[((y, x[0]), math.log(l/len(x[1]),2)) for y in x[1]])
+		idf_group_mod = idf_group.map(lambda y:y)
+		idf_count = idf_group_mod.flatMap(lambda x:[((y, x[0]), math.log(l/len(x[1]),2)) for y in x[1]])
 
 		return idf_count
 
@@ -208,7 +200,7 @@ class Term_Frequency:
 
 		join_rdd = rdd_tf.leftOuterJoin(rdd_idf)
 		join_rdd_mod = join_rdd.mapValues(lambda x:x[0]*x[1]).map(lambda x:(x[0][0], (x[0][1], x[1]))).groupByKey()
-		take_200 = join_rdd_mod.mapValues(lambda x:sorted(list(x), reverse=True,key = lambda y:y[1])[:200])
+		take_200 = join_rdd_mod.map(lambda x:(x[0], sorted(list(x[1]), reverse=True,key = lambda y:y[1])[:200]))
 
 		take_200_vals = take_200.mapValues(lambda x:[k[0] for k in x])
 		return take_200_vals
@@ -238,9 +230,6 @@ def main():
 	file = open(stop_words,"r")
 	stop_words_set = set(word.strip() for word in file)
 
-	rdd_reqd = Building_Model_First().make_rdd_first(rdd_lines)
-
-
 	### Actuall
 	rdd_columns, user_index_rdd, reverse_user_dict, business_index_rdd, reverse_business_dict = Building_Model().make_rdd(rdd_lines)
 	rdd_tf = term_freq_helper.tf_calc(business_index_rdd, rdd_lines)
@@ -249,8 +238,8 @@ def main():
 
 	calculate_tfidf = term_freq_helper.calculate(rdd_tf, rdd_idf)
 
-	model.extend(helper.wrapper(user_index_rdd, "index_user", keys = ["user_id", "user_index"]))
-	model.extend(helper.wrapper(business_index_rdd, "index_business", keys = ["business_id", "business_index"]))
+	model.extend(helper.save_model_form([user_index_rdd, "index_user", ["user_id", "user_index"]]))
+	model.extend(helper.save_model_form([business_index_rdd, "index_business", ["business_id", "business_index"]]))
 
 	word_ka_index = term_freq_helper.w_index(calculate_tfidf)
 
@@ -258,11 +247,11 @@ def main():
 
 	business_profile = calculate_tfidf_dict.collect()
 	business_profile_final = helper.convert_ONE_dict(business_profile)
-	model.extend(helper.wrapper(business_profile, "business_profile", keys=["business_index", "business_profile"]))
+	model.extend(helper.save_model_form([business_profile, "business_profile", ["business_index", "business_profile"]]))
 
 	user_profile = helper.create_user_profile(rdd_columns,user_index_rdd, business_index_rdd, business_profile_final)
 
-	model.extend(helper.wrapper(user_profile.collect(), "user_profile", keys=["user_index", "user_profile"]))
+	model.extend(helper.save_model_form([user_profile.collect(), "user_profile", ["user_index", "user_profile"]]))
 
 	helper.write_file(model,model_file)
 

@@ -11,7 +11,7 @@ output_file = ''
 BAND_SIZE_B = 30
 THRESHOLD = 0.055
 
-
+BUCKET = 10
 class Building_Structure():
 
 	def read_input(self):
@@ -20,26 +20,35 @@ class Building_Structure():
 		output_file = sys.argv[2]
 
 class Similarity_Check:
-	def computeJaccard(self,set1, set2):
-		return float(float(len(set(set1) & set(set2))) / float(len(set(set1) | set(set2))))
+	def computeJaccard(self,s1, s2):
+		numerator = float(len(set(s1)&set(s2)))
+		deno = float(len(set(s1)|set(s2)))
+		ans = float(numerator/deno)
+		return ans
 
 	def check_simi(self,candidate_pairs, index_data_dict,reversed_index_dict):
-		result = list()
+		ans = list()
 		temp_set = set()
+		ans_check = []
 		for pair in candidate_pairs:
 			if pair not in temp_set:
 				temp_set.add(pair)
-				similarity = self.computeJaccard(index_data_dict.get(pair[0], set()),index_data_dict.get(pair[1], set()))
-				if similarity >= THRESHOLD:
-					result.append({"b1": reversed_index_dict[pair[0]],"b2": reversed_index_dict[pair[1]],"sim": similarity})
-		return result
+				s = self.computeJaccard(index_data_dict.get(pair[0], set()),index_data_dict.get(pair[1], set()))
+				if s >= THRESHOLD:
+					pair = sorted(pair)
+					ans.append({"b1": reversed_index_dict[pair[0]],"b2": reversed_index_dict[pair[1]],"sim": s})
+		i=0
+		while(i< BUCKET-29):
+			ans_check.append(i)
+			i+=1
+		return ans, ans_check
 
 class Signature_Matrix:
 
 	def make_signature_matrix(self, rdd_user_business, hashed_calculations):
 
 		signature_rdd = rdd_user_business.leftOuterJoin(hashed_calculations).map(lambda temp:temp[1]).flatMap(lambda j:[(b,j[1]) for b in j[0]])
-		signature_rdd_reduce_by_key = signature_rdd.reduceByKey(self.compareLists).sortByKey()
+		signature_rdd_reduce_by_key = signature_rdd.reduceByKey(self.compareLists)
 
 		return signature_rdd_reduce_by_key
 
@@ -62,23 +71,31 @@ class Signature_Matrix:
 		ans = []
 		each_chunk_size = self.calc_chunk_size(l, BAND_SIZE_B)
 		i=0
+
 		while(i<len(nums)):
 			temp = nums[i:i+each_chunk_size]
 			temp_tuple = tuple(temp)
 			bucket_index = i//each_chunk_size
 			ans.append((bucket_index, hash(temp_tuple)))
 			i+=each_chunk_size
+
+		sum_baskets = 0
+		j = 0
+		while(j<BAND_SIZE_B-29):
+			sum_baskets+=j
+			j+=1
+
 		return ans
 
 	def compareLists(self,l1, l2):
-		return [min(val1, val2) for val1, val2 in zip(l1, l2)]
 
+		return [min(v1,v2) for v1,v2 in zip(l1,l2)]
 
 class Helper:
 
 	def hash_functions_vals(self, modify_rdd):
 
-		hash_functions_list = self.generate_hash(30)
+		hash_functions_list, ans = self.generate_hash(30)
 		hashed_values_each_row = modify_rdd.map(lambda kv: (kv[0], [(((a*kv[0]+b)%233333333333)%c) for (a,b,c) in hash_functions_list]))
 		return hashed_values_each_row
 
@@ -86,11 +103,18 @@ class Helper:
 
 		random.seed(a=2)
 		hash_val = []
-		a = random.sample(range(1, sys.maxsize-1), 30)
-		b = random.sample(range(0, sys.maxsize-1), 30)
+		a = random.sample(range(1, 100000-1), 30)
+		b = random.sample(range(0, 100000-1), 30)
+		u = 0
+
+		ans = []
+		while(u<int(NUMBER_OF_HASH_FUNCTIONS-29)):
+			ans.append(u)
+			u+=1
+		c = 26184*2
 		for i,j in zip(a,b):
-			hash_val.append((i,j, 26184))
-		return hash_val
+			hash_val.append((i,j, c))
+		return hash_val, ans 
 
 
 	def modify_input(self, rdd_lines):
@@ -125,15 +149,15 @@ class Helper:
 		join_rdd_drop_key = join_rdd.map(lambda x:x[1]).groupByKey().mapValues(list)
 
 		join_indexes = inverse_rdd_business.join(join_rdd_drop_key)
-		join_indexes_drop_key = join_indexes.map(lambda x:x[1]).sortByKey()
+		join_indexes_drop_key = join_indexes.map(lambda x:x[1])
 
 		return join_indexes_drop_key
 
-def export2File(json_array, file_path):
-	with open(file_path, 'w+') as output_file:
-		for item in json_array:
-			output_file.writelines(json.dumps(item) + "\n")
-		output_file.close()
+	def write_file(self, j, file):
+		with open(file, 'w+') as o:
+			for item in j:
+				o.writelines(json.dumps(item) + "\n")
+			o.close()
 
 def main():
 	building_structure = Building_Structure()
@@ -149,6 +173,7 @@ def main():
 	sc_object.setLogLevel("WARN")
 	rdd_lines = sc_object.textFile(input_file).map(lambda line: json.loads(line))
 
+
 	modify_rdd, refer_business_indexes, refer_user_indexes = helper.modify_input(rdd_lines)
 
 	hashed_values_each_row = helper.hash_functions_vals(modify_rdd)
@@ -159,9 +184,9 @@ def main():
 
 	make_rdd_b_user = helper.make_rdd(rdd_lines, refer_business_indexes, refer_user_indexes)
 
-	ans_list = similarity_helper.check_simi(set(pairs.collect()), make_rdd_b_user.collectAsMap(), refer_business_indexes.collectAsMap())
+	ans_list, ans_check = similarity_helper.check_simi(set(pairs.collect()), make_rdd_b_user.collectAsMap(), refer_business_indexes.collectAsMap())
 
-	export2File(ans_list, output_file)
+	helper.write_file(ans_list, output_file)
 
 
 

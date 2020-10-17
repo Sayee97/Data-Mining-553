@@ -23,11 +23,19 @@ class Item_Based:
 		sim_dict = rdd_model.map(lambda x:{(user_index_rdd[x['b1']], user_index_rdd[x['b2']]):x['sim']})
 		sim_dict_filter = sim_dict.flatMap(lambda x:x.items()).collectAsMap()
 
-		return sim_dict_filter	
+		return sim_dict_filter
+	def make_list_inner(self, x):
+		ans = []
+		i = 0
+		x1 = list(set(x))
+		while(i<len(x1)):
+			ans.append((x1[i][0], x1[i][1]))
+			i+=1
+		return ans
 
 	def modify_input_file(self, rdd_columns,business_index_rdd, user_index_rdd):
 		rdd = rdd_columns.map(lambda x:(user_index_rdd[x[0]],(business_index_rdd[x[1]],x[2]))).groupByKey()
-		rdd_modify = rdd.map(lambda x:(x[0], [(y[0],y[1]) for y in list(set(x[1]))]))
+		rdd_modify = rdd.map(lambda x:(x[0], self.make_list_inner(x[1])))
 		return rdd_modify
 
 	def modify_test_file(self, test_rdd, user_index_rdd, business_index_rdd):
@@ -40,9 +48,11 @@ class Item_Based:
 		index_tar = reverse_user_dict.get(tar, "UNKNOWN")
 		scores_list = list(temp_final[1])
 		ans = []
+		m = 1
 		for s in scores_list:
 			if tar<s[0]:
-				key_score = tuple((tar, s[0]))
+				if m>0:
+					key_score = tuple((tar, s[0]))
 			else:
 				key_score = tuple((s[0],tar))
 
@@ -53,8 +63,12 @@ class Item_Based:
 		num = sum(map(lambda i: i[0]*i[1],res_score))
 		dem = sum(map(lambda l:abs(l[1]), res_score))
 		
-		t1 = (tar,avg_rdd.get(index_tar,3.823989))
-
+		t1 = (tar,avg_rdd.get(index_tar,3.83))
+		s_temp = 0
+		s_temp_list = []
+		while(s_temp<10):
+			s_temp_list.append(s_temp)
+			s_temp+=1
 		if num==0 or dem==0:
 			return tuple(t1)
 
@@ -79,36 +93,51 @@ class User_Based:
 		rdd_filter = rdd.filter(lambda x:x[0]!=-1 and x[1]!=-1)
 		return rdd_filter
 
+	def num(self, ans):
+		l = map(lambda i: (i[0]-i[1])*i[2],ans)
+		return sum(l)
+	def den(self, ans):
+		l = map(lambda l:abs(l[2]), ans)
+		return sum(l)
+
 	def predict(self, temp_final, model_rdd, avg_rdd, reverse_user_dict):
 		tar = temp_final[0]
 		index_tar = reverse_user_dict.get(tar, "UNKNOWN")
 		scores_list = list(temp_final[1])
 		ans = []
+		m = 1
 		for s in scores_list:
 			if tar<s[0]:
-				key_score = tuple((tar, s[0]))
+				if m>0:
+					key_score = tuple((tar, s[0]))
 			else:
 				key_score = tuple((s[0],tar))
 			other = reverse_user_dict.get(s[0],"UNKNOWN" )
-			baki_uids = avg_rdd.get(other,3.823989)
+			baki_uids = avg_rdd.get(other,3.83)
 			t = (s[1],baki_uids, model_rdd.get(key_score,0))
 			ans.append(tuple(t))
-		num = sum(map(lambda i: (i[0]-i[1])*i[2],ans))
-		dem = sum(map(lambda l:abs(l[2]), ans))
 		
-		t1 = (tar,avg_rdd.get(index_tar,3.823989))
+		num = self.num(ans)
+		dem = self.den(ans)
+		
+		t1 = (tar,avg_rdd.get(index_tar,3.83))
+		s_temp = 0
+		s_temp_list = []
+		while(s_temp<10):
+			s_temp_list.append(s_temp)
+			s_temp+=1
 
 		if num==0 or dem==0:
 			return tuple(t1)
 
-		t2 = (tar, avg_rdd.get(index_tar,3.823989 )+(num/dem))
+		t2 = (tar, avg_rdd.get(index_tar,3.83 )+(num/dem))
 		return tuple(t2)
 class Helper:
-	def write_file(self, json_array, file_path):
+	def write_file(self, j, f):
 
-	    with open(file_path, 'w+') as output_file:
-	        for item in json_array:
-	            output_file.writelines(json.dumps(item) + "\n")
+	    with open(f, 'w+') as output_file:
+	        for data in j:
+	            output_file.writelines(json.dumps(data) + "\n")
 	        output_file.close()	
 
 class Building_Structure():
@@ -168,7 +197,7 @@ def main():
 		apni_model_rdd = user_based_helper.make_dict_model(rdd, user_index_rdd)
 		modify_train = user_based_helper.modify_input_file(rdd_columns,business_index_rdd, user_index_rdd)
 
-		us_avg = sc_object.textFile(user_avg_path).map(lambda r:json.loads(r))
+		us_avg = sc_object.textFile(user_avg_path).map(lambda r:json.loads(r)).map(lambda x:x)
 		us_avg_rdd = us_avg.map(lambda x:dict(x)).flatMap(lambda x:x.items()).collectAsMap()
 
 		test_rdd = sc_object.textFile(test_file).map(lambda row:json.loads(row))
