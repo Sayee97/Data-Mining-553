@@ -1,0 +1,15 @@
+user_id,state
+A, CA
+B, CA
+A, MB
+C, MB
+B, PQ
+C, PQ
+A, MV
+D, MV
+D, UV
+C, UV
+D, OU
+E, OU
+E, BC
+C, BC
