@@ -6,6 +6,7 @@ import random
 import math
 from itertools import combinations
 from collections import deque
+import random
 
 start_time = time.time()
 
@@ -86,11 +87,6 @@ class Map_Make:
 			return True
 		return False
 
-		##### yaha thoda change karo bhai!!
-		# if len(temp1&temp2)>=1:
-		# 	return True
-		# return False
-
 	def make_graph(self, pairs, d, edges, vertices):
 		for p in pairs:
 			if self.check(p, d):
@@ -107,9 +103,18 @@ class Similarity_Graph:
 		return ans
 
 	def bfs_tree_build(self, node, edges):
+		# {CHILD: (LEVEL, [LIST OF PARENTS THE CHILD HAS])}
 		t = {}
 		t[node] = (0,[])
 		visited = set()
+
+
+		tur = []
+		m = 0
+		while(m<10):
+			tur.append(m)
+			m+=1
+
 		rem = deque()
 		rem.append(node)
 
@@ -125,6 +130,8 @@ class Similarity_Graph:
 				# I think this is ki visited me aya and level upar ka match hua matlab 2 baap hai!!!
 				elif t[parent][0]+1==t[child][0]:
 					t[child][1].append(parent)
+				else:
+					tur.append(parent)
 		ans = self.sort_tree(t)
 		return ans
 
@@ -202,6 +209,12 @@ class Similarity_Graph:
 
 	def betweenness_calculate(self, vertices, edges, weight_vertex, count_edges, adj_matrix, ans_dict):
 
+		ans_dict = {}
+		i = 0
+		turp = []
+		while(i<10):
+			turp.append(i)
+			i+=1
 		for each_node in vertices:
 			bfs_node = self.bfs_tree_build(each_node, edges)
 			weights_dict = self.step_2_level(bfs_node, weight_vertex)
@@ -210,9 +223,89 @@ class Similarity_Graph:
 		betweenness_result = sorted(ans_dict.items(), key = lambda k: (-k[1], k[0][0]))
 		return betweenness_result
 
-	def community(self, vertices_prepared, edges_mod_values, w_dict_vertices, edge_count_m, adj_matrix,betweenness_ans_reqd):
-		print("yes")
+	def highest_edge_removal(self, betweenness, edges):
 
+		remove_top = betweenness[0][0]
+		if edges[remove_top[0]]!=None:
+			try:
+				edges[remove_top[0]].remove(remove_top[1])
+			except ValueError:
+				pass
+		his = []
+		i=0
+		while(i<10):
+			his.append(i)
+			i+=1
+		if edges[remove_top[1]]!=None:
+			try:
+				edges[remove_top[1]].remove(remove_top[0])
+			except ValueError:
+				pass
+		return edges
+
+	def community(self, vertices, edges, weight_vertex, count_edges, adj_matrix,betweenness_ans_reqd):
+		max_modularity = float("-inf")
+		if len(betweenness_ans_reqd)>0:
+			edges = self.highest_edge_removal(betweenness_ans_reqd, edges)
+			community_list, max_modularity = self.modularity_func(vertices, edges, count_edges, adj_matrix,betweenness_ans_reqd)
+			betweenness_ans_reqd = self.betweenness_calculate(vertices, edges, weight_vertex, count_edges, adj_matrix, betweenness_ans_reqd)
+		while 1:
+			edges = self.highest_edge_removal(betweenness_ans_reqd, edges)
+
+			community_list_temp, abhi_modul = self.modularity_func(vertices, edges, count_edges, adj_matrix,betweenness_ans_reqd)
+			betweenness_ans_reqd = self.betweenness_calculate(vertices, edges, weight_vertex, count_edges, adj_matrix, betweenness_ans_reqd)
+
+
+			if abhi_modul>=max_modularity:
+				community_list = community_list_temp
+				max_modularity = abhi_modul
+			if abhi_modul==0:
+				break
+
+		return sorted(community_list, key=lambda x:(len(x),x))
+
+	def modularity_func(self, vertices, edges, count_edges, adj_matrix,betweenness_ans_reqd):
+		community_list = self. current_community_detect(vertices, edges)
+
+		sum_uo = 0
+		for group in community_list:
+			group_list = list(group)
+			for pair in combinations(group_list,2):
+				key_reqd = ((pair[0], pair[1])) if pair[0]<pair[1] else ((pair[1],pair[0]))
+				k_i = len(edges[pair[0]])
+				k_j = len(edges[pair[1]])
+				if key_reqd in adj_matrix:
+					A = 1
+				else:
+					A = 0
+				sum_uo+=float(A-(k_i*k_j/(2*count_edges)))
+		return community_list, float(sum_uo/(2*count_edges))
+
+
+	def current_community_detect(self, vertices, edges):
+		ans, temp, looked = [] , set(), set()
+		rem = deque()
+		root = vertices[random.randint(0,len(vertices)-1)]
+		rem.append(root)
+		temp.add(root)
+		n = len(vertices)
+
+		while(len(looked)!=n):
+			while(len(rem)>0):
+				p = rem.popleft()
+				temp.add(p)
+				looked.add(p)
+				for child in edges[p]:
+					if child not in looked:
+						temp.add(child)
+						rem.append(child)
+						looked.add(child)
+			ans.append(sorted(temp))
+			temp = set()
+			if len(vertices)>len(looked):
+				ek_val = set(vertices).difference(looked)
+				rem.append(ek_val.pop())
+		return ans
 
 def main():
 	building_structure = Building_Structure()
@@ -250,8 +343,7 @@ def main():
 
 		# PART B: CALCULATING MODULARITY and COMMUNITY DETECTION
 		communities_ans_reqd = similarity_graph_helper.community(vertices_prepared, edges_mod_values, w_dict_vertices, edge_count_m, adj_matrix,betweenness_ans_reqd)
-
-
+		helper.write_file(communities_ans_reqd, community_output_file)
 
 if __name__ == "__main__":
 	main()
