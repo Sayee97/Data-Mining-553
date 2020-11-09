@@ -56,15 +56,16 @@ class Training:
 		while(u<int(NUMBER_OF_HASH_FUNCTIONS-29)):
 			ans.append(u)
 			u+=1
-		a = random.sample(range(1, 1000000-1), 7)
-		b = random.sample(range(0, 1000000-1), 7)
+		a = random.sample(range(1, sys.maxsize-1), 50)
+		b = random.sample(range(0, sys.maxsize-1), 50)
 		for i,j in zip(a,b):
-			hash_val.append((i,j, 7000))
+			hash_val.append((i,j, 74737*50))
 		return hash_val
 
 	def hash_apply(self, rdd):
 		global vals
 		vals = self.generate_hash()
+		print(rdd.count())
 		rdd_mod = set(rdd.flatMap(lambda x: self.hash_functions_vals(x, vals)).collect())
 		return rdd_mod
 
@@ -75,11 +76,11 @@ class Prediction:
 			x_mod = int(binascii.hexlify(x.encode('utf8')),16)
 			vals_compute = set( Training().hash_functions_vals(x_mod, vals))
 			if vals_compute.issubset(hash_output):
-				yield 1
+				yield "T"
 			else:
-				yield 0
+				yield "F"
 		else:
-			yield 0
+			yield "F"
 
 	def predict_gen(self, rdd, hash_output):
 		rdd_mod = rdd.flatMap(lambda x: self.predict(x,hash_output))
