@@ -29,7 +29,7 @@ API_KEY = 'fvFhiMmX69DZWZELDc6AWqv5E'
 API_SECRET_KEY = 'qYVmALOZrsBzJFms8uBAvx608HNMZaFG3ud9Ctub54dIqaJJ92'
 ACCESS_TOKEN = '1323688688610504704-Us1hXTHv22bsSCm3m6TZ4IlZagrpoE'
 ACCESS_SECRET = '2NfukbtBWStavsLDP4Diz0i90nIvLrpUHTaf6IkUneC84'
-
+HASH_FUNCTIONS = 3
 class Building_Structure():
 
 	def read_input(self):
@@ -57,12 +57,19 @@ class Reservoir_Sampling(StreamListener):
 		ou.write(out+"\n")
 		ou.close()
 
+	def check_al(self, l):
+		c = 0
+		for i in l:
+			if i["text"].isalnum()==False:
+				return False
+		return True
+
 	def on_status(self, status):
 		global number_tweets, tweets
 		d = {}
 		total_hash = self.get_hashtags(status)
 
-		if len(total_hash)>0:
+		if len(total_hash)>0 and self.check_al(total_hash):
 			number_tweets+=1
 
 			if number_tweets<TOTAL_ALLOWED_WINDOW:
@@ -72,19 +79,29 @@ class Reservoir_Sampling(StreamListener):
 				if index<TOTAL_ALLOWED_WINDOW-1:
 					tweets[index] = status
 
-				for i in tweets:
-					hash_tags = self.get_hashtags(i)
+				i=0
+				while(i<len(tweets)):
+
+					hash_tags = self.get_hashtags(tweets[i])
 					for j in hash_tags:
 						if j["text"].isalnum():
 							if j["text"] not in d.keys():
 								d[j["text"]] = 1
 							else:
-								d[j["text"]] +=1
+								d[j["text"]] += 1					
+					i+=1
+
 				lexo = sorted(d.items(), key = lambda x: (-x[1], x[0]))
 				
 				freq_list = sorted(list(set(d.values())), reverse = True)
 
 				freq_list_1 = freq_list[:3]
+
+				ans1 = []
+				u=0
+				while(u<HASH_FUNCTIONS):
+					ans1.append(u)
+					u+=1
 
 				top = []
 				for i in lexo:

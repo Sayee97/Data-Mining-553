@@ -15,7 +15,6 @@ port = ''
 output_file = ''
 times_count = 0
 
-
 class Building_Structure():
 
 	def read_input(self):
@@ -39,12 +38,6 @@ class Helper:
 			x = self.calc_bin(bin_num)
 		return x
 
-	# def write_file(self, j, file):
-	# 	with open(file, 'w+', newline="") as o:
-	# 		w = csv.writer(o, delimiter=' ')
-	# 		w.writerow(j)
-	# 	o.close()
-
 	def modify_input(self, rdd_lines):
 		rdd_reqd = rdd_lines.map(lambda x_name: x_name['name']).distinct()
 		rdd_reqd_fil = rdd_reqd.filter(lambda x:x!="").map(lambda x: int(binascii.hexlify(x.encode('utf8')),16))
@@ -59,8 +52,8 @@ def FM_Algo(data):
 	global times_count
 	data_stream = data.collect()
 	len1 = len(data_stream)
-	n = int(math.ceil(math.log(len1)))
-	hash_functions = n*4
+	n = 15
+	hash_functions = 30
 
 	data_truth = len(set(data_stream))
 	if times_count==0:
@@ -72,9 +65,9 @@ def FM_Algo(data):
 
 	t = time.time()
 	start = datetime.datetime.fromtimestamp(t).strftime('%Y-%m-%d %H:%M:%S')
-	random.seed(5)
-	a = random.sample(range(0, (1000000)-1),hash_functions)
-	b = random.sample(range(0, (1000000)-1),hash_functions)
+	random.seed(11)
+	a = random.sample(range(0, (2**16)-1),hash_functions)
+	b = random.sample(range(0, (2**16)-1),hash_functions)
 	R_trailing = []
 	actual = set()
 	for i in range(hash_functions):
@@ -85,7 +78,7 @@ def FM_Algo(data):
 			state = j["state"]
 			actual.add(state)
 			int_num = int(binascii.hexlify(state.encode('utf8')),16)
-			hash_num = ((a[i]*int_num+b[i])%((2**10)-1))%200
+			hash_num = ((a[i]*int_num+b[i])%(2**13-1))
 			bin_num = helper.bin_val(hash_num)
 
 			temp = helper.calc_zero(hash_num, bin_num)
@@ -93,16 +86,13 @@ def FM_Algo(data):
 				x=temp
 		R_trailing.append(2**x)
 
-	print(R_trailing, "sayee")
-
 	t = 0
 	list_ans = [0]*n
 	while(t<n):
-		term = R_trailing[t*4:(t+1)*4]
+		term = R_trailing[t*2:(t+1)*2]
 		list_ans[t] = (float(sum(term)/len(term)))
 		t+=1
 	list_ans.sort()
-
 	ou.write(str(start)+","+str(len(actual))+","+str(int(list_ans[n//2]))+"\n")
 	ou.close()
 
@@ -115,8 +105,6 @@ def main():
 	building_structure.read_input()
 
 	print("Arguments Passed: ", port, output_file)
-	# s = SparkSession.builder.master("local[*]").appName("HW5").getOrCreate()
-	# sc = s.sparkContext
 	sc.setLogLevel("OFF")
 	steamContext = StreamingContext(sc, 5)
 	lines = steamContext.socketTextStream("localhost", int(port))
